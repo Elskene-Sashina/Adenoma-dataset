@@ -1,0 +1,277 @@
+## Modules and Analysis Workflow
+
+### 1. Data Import and Descriptive Statistics
+The data is loaded from a CSV file, missing values are handled, and basic descriptive statistics are generated.
+
+# Import the dataset
+```r
+file_url <- "https://drive.google.com/uc?export=download&id=1ejSVvnWfX4elV1hOcQLsZKENaLznkQyH"
+adenoma_file <- read.csv(file_url, 
+                         header = TRUE, 
+                         sep = ';', 
+                         na.strings = c('-', '-99', ' ', 'NA'), 
+                         dec = ",", 
+                         stringsAsFactors = FALSE)
+```
+# Load required packages
+library(DescTools) 
+library(ggplot2)
+library(skimr)
+library(tidyr)
+library(dplyr)
+library(corrr)
+library(corrplot)
+
+# Collect basic statistics
+```r
+skimr::skim(adenoma_file)
+
+Without_adenoma_file <- adenoma_file %>% 
+  filter(Diagnosis == 0)
+skimr::skim(Without_adenoma_file)
+
+With_adenoma_file <- adenoma_file %>% 
+  filter(Diagnosis == 1)
+skimr::skim(With_adenoma_file)
+```
+
+
+### 2. Data Preprocessing:
+Check for missing values in cases where Diagnosis == 0
+```r
+skimr::skim(Without_adenoma_file)
+```
+
+Re-index the 'No' column
+```r
+adenoma_file$No <- seq_len(nrow(adenoma_file))
+```
+
+
+### 3. Descriptive Statistics and Variable Transformation
+Using the DescTools package, we generate descriptive statistics and transform variables 
+Basic descriptive statistics and listing variables
+```r
+Desc(adenoma_file)
+names(adenoma_file)
+```
+
+Create a new variable: logarithm of prolactin level
+```r
+adenoma_file$log_PRL <- log(adenoma_file$PRL)
+Desc(adenoma_file$log_PRL)
+```
+
+Convert variables to factors and describe differences
+```r
+adenoma_file$Diagnosis <- as.factor(adenoma_file$Diagnosis)
+Desc(adenoma_file$Age ~ adenoma_file$Diagnosis)
+
+adenoma_file$SSTR2 <- as.factor(adenoma_file$SSTR2)
+Desc(adenoma_file$SSTR2)
+
+adenoma_file$SSTR5 <- as.factor(adenoma_file$SSTR5)
+Desc(adenoma_file$SSTR5)
+
+adenoma_file$Gender <- as.factor(adenoma_file$Gender)
+levels(adenoma_file$Gender) <- c("Женский", "Мужской")
+Desc(adenoma_file$Gender)
+```
+
+
+### 4. Visualization
+Use various plots  to visualize distributions and relationships
+plots for distributions
+```r
+boxplot(adenoma_file$Age, main = "Распределение возраста пациентов", ylab = "Возраст")
+hist(adenoma_file$log_PRL, main = "Логарифм уровня пролактина", xlab = "lPRL", ylab = "Частота")
+```
+
+Summary statistics for selected columns
+```r
+summary(adenoma_file[c("Age", "Height", "Weight", "BMI", "IGF1", "GH", "PRL", "Tumor.volume")])
+```
+
+Calculate group means and medians
+```r
+mean_height <- adenoma_file %>% group_by(Diagnosis) %>% summarize(Height_mean = mean(Height, na.rm=TRUE))
+mean_weight <- adenoma_file %>% group_by(Diagnosis) %>% summarize(Weight_mean = mean(Weight, na.rm=TRUE))
+mean_age <- adenoma_file %>% group_by(Diagnosis) %>% summarize(age_mean = mean(Age, na.rm=TRUE))
+mean_BMI <- adenoma_file %>% group_by(Diagnosis) %>% summarize(BMI_mean = mean(BMI, na.rm=TRUE))
+median_height <- adenoma_file %>% group_by(Diagnosis) %>% summarize(Height_median = median(Height, na.rm=TRUE))
+median_weight <- adenoma_file %>% group_by(Diagnosis) %>% summarize(Height_median = median(Weight, na.rm=TRUE))
+median_age <- adenoma_file %>% group_by(Diagnosis) %>% summarize(age_median = median(Age, na.rm=TRUE))
+median_BMI <- adenoma_file %>% group_by(Diagnosis) %>% summarize(BMI_median = median(BMI, na.rm=TRUE))
+```
+
+Plotting histograms and plots
+```r
+hist(adenoma_file$Age, breaks = 30)
+hist(adenoma_file$Height, breaks = 30)
+hist(adenoma_file$Weight, breaks = 30)
+hist(adenoma_file$BMI, breaks = 30)
+
+plot(mean_BMI$Diagnosis, y = mean_BMI$BMI_mean, pch = "*", col = 'blue', cex = 6, ylim = c(0, 40))
+plot(mean_weight$Diagnosis, y = mean_weight$Weight_mean, pch = "*", col = 'blue', cex = 6, ylim = c(0, 100))
+plot(mean_height$Diagnosis, y = mean_height$Height_mean, pch = "*", col = 'blue', cex = 6, ylim = c(0, 180))
+plot(mean_age$Diagnosis, y = mean_age$age_mean, pch = "*", col = 'blue', cex = 6, ylim = c(0, 50))
+plot(median_BMI$Diagnosis, y = median_BMI$BMI_median, pch = "*", col = 'purple', cex = 6, ylim = c(0, 40))
+plot(median_weight$Diagnosis, y = median_weight$Height_median, pch = "*", col = 'purple', cex = 6, ylim = c(0, 100))
+plot(median_height$Diagnosis, y = median_height$Height_median, pch = "*", col = 'purple', cex = 6, ylim = c(0, 180))
+```
+
+Comparison of hormone levels by Histotype using ggplot2
+```r
+ggplot(adenoma_file, aes(x = Diagnosis, y = IGF1, fill = "lightgreen")) +
+  geom_boxplot() +
+  scale_fill_viridis(discrete = TRUE, alpha = 0.6) +
+  geom_jitter(color = "black", size = 0.4, alpha = 0.9) +
+  theme_ipsum() +
+  theme(legend.position = "none", plot.title = element_text(size = 11)) +
+  facet_wrap(~ Diagnosis, nrow = 2) +
+  ggtitle("Уровень IGF1 по наличию аденомы") +
+  xlab("Гистотип") +
+  ylab("IGF1")
+```
+
+# Additional analyses include mosaic plots for categorical variables
+Create data frames for each Histotype
+```r
+SGSA <- With_adenoma_file %>% filter(Histotype == "SGSA")
+DGSA <- With_adenoma_file %>% filter(Histotype == "DGSA")
+MSLA <- With_adenoma_file %>% filter(Histotype == "MSLA")
+MSA <- With_adenoma_file %>% filter(Histotype == "MSA")
+```
+
+Create a vector of colors for unique Histotype values
+```r
+unique_histotypes <- unique(With_adenoma_file$Histotype)
+color_palette <- rainbow(length(unique_histotypes))
+histotype_colors <- setNames(color_palette, unique_histotypes)
+```
+
+Assign colors based on Histotype and plot selected variables
+```r
+plot_colors <- histotype_colors[With_adenoma_file$Histotype]
+With_adenoma_file %>% select(IGF1:SSTR5) %>% plot(col = plot_colors, pch = 19)
+legend("topright", legend = unique_histotypes, col = color_palette, pch = 19)
+```
+
+
+### 5. Correlation Analysis:
+Correlation tests (Pearson and Spearman) are performed to explore relationships between variables. Both positive and negative correlations were identified:
+
+Negative correlations:  
+DA.preop & SSTR2, SSTR2 & DI.after.surgery, Tumor.volume & PRL, Adenoma.size & PRL
+Positive correlations:
+GH & Postop.remission, Postop.remission & IGF1, IGF1 & GH
+
+Convert variables to numeric 
+```r
+adenoma_file$DA.preop         <- as.numeric(adenoma_file$DA.preop)
+adenoma_file$SSTR2            <- as.numeric(adenoma_file$SSTR2)
+adenoma_file$DI.after.surgery <- as.numeric(adenoma_file$DI.after.surgery)
+adenoma_file$Tumor.volume     <- as.numeric(adenoma_file$Tumor.volume)
+adenoma_file$PRL              <- as.numeric(adenoma_file$PRL)
+adenoma_file$Adenoma.size     <- as.numeric(adenoma_file$Adenoma.size)
+adenoma_file$GH               <- as.numeric(adenoma_file$GH)
+adenoma_file$Postop.remission <- as.numeric(adenoma_file$Postop.remission)
+adenoma_file$IGF1             <- as.numeric(adenoma_file$IGF1)
+```
+
+# Сorrelation tests:
+--- Negative Correlations ---
+DA.preop & SSTR2 -  p-value < 0.05 - statistically significant
+```r
+cor_da_sstr2 <- cor.test(adenoma_file$DA.preop, adenoma_file$SSTR2, method = "pearson")
+print(cor_da_sstr2)
+```
+
+SSTR2 & DI.after.surgery - p-value > 0.05 - not statistically significant
+```r
+cor_sstr2_di <- cor.test(adenoma_file$SSTR2, adenoma_file$DI.after.surgery, method = "pearson")
+print(cor_sstr2_di)
+```
+
+--- Positive Correlations ---
+GH & Postop.remission -  p-value < 0.05 - statistically significant
+```r
+cor_gh_postop <- cor.test(adenoma_file$GH, adenoma_file$Postop.remission, method = "pearson")
+print(cor_gh_postop)
+```
+
+Postop.remission & IGF1 -  p-value < 0.05 - statistically significant
+```r
+cor_postop_igf1 <- cor.test(adenoma_file$Postop.remission, adenoma_file$IGF1, method = "pearson")
+print(cor_postop_igf1)
+```
+
+IGF1 & GH - p-value > 0.05 - not statistically significant
+```r
+cor_igf1_gh <- cor.test(adenoma_file$IGF1, adenoma_file$GH, method = "pearson")
+print(cor_igf1_gh)
+```
+
+
+### 6. Multiple Regression Analyses
+Tumor.volume ~ SSTR2 + GH + PRL + IGF1
+```r
+model_hormones <- lm(Tumor.volume ~ SSTR2 + GH + PRL + IGF1, data = With_adenoma_file)
+summary(model_hormones)
+```
+Conclusions:
+SSTR2: With an increase of 1 unit, tumor volume decreases by 104.94 (p-value > 0.05 - not statistically significant).
+GH: With an increase of 1 unit, tumor volume increases by 60.23 (p-value < 0.05 - statistically significant).
+PRL: With an increase of 1 unit, tumor volume decreases by 0.63 (p-value > 0.05 - not statistically significant).
+IGF1: With an increase of 1 unit, tumor volume decreases by 1.86 (p-value > 0.05 - not statistically significant).
+
+
+### 7. ANOVA
+ANOVA is used to test for differences in tumor volume based on multiple factors and their interactions.
+```r
+aov_model_interaction <- aov(Tumor.volume ~ SSTR2 * SSTR5 * GH * IGF1 * PRL, data = With_adenoma_file)
+summary(aov_model_interaction)
+```
+Conclusion:
+GH and SSTR5 appear as key predictors
+interactions between SSTR2, IGF1, PRL with GH and SSTR5 also influence tumor volume.
+
+
+### 8. Mann–Whitney (Wilcoxon) Test 
+The Wilcoxon Rank-Sum Test is used for variables with non-normal distributions:
+IGF1 ~ Postop.remission -  p-value < 0.05 - statistically significant
+```r
+wilcox.test(IGF1 ~ Postop.remission, data = adenoma_file)
+```
+
+GH ~ Postop.remission -  p-value < 0.05 - statistically significant
+```r
+wilcox.test(GH ~ Postop.remission, data = adenoma_file)
+```
+
+PRL ~ Postop.remission - p-value > 0.05 - not statistically significant
+```r
+wilcox.test(PRL ~ Postop.remission, data = adenoma_file)
+```
+
+
+### 9. Paired t-Test:
+DA.preop & Postop.remission -  p-value < 0.05 - statistically significant
+```r
+t.test(With_adenoma_file$DA.preop, With_adenoma_file$Postop.remission, paired = TRUE)
+```
+
+PRL & Hypopituitarism.after.surgery -  p-value < 0.05 - statistically significant
+```r
+t.test(With_adenoma_file$PRL, With_adenoma_file$Hypopituitarism.after.surgery, paired = TRUE)
+```
+
+IGF1 & Hypopituitarism.after.surgery -  p-value < 0.05 - statistically significant
+```r
+t.test(With_adenoma_file$IGF1, With_adenoma_file$Hypopituitarism.after.surgery, paired = TRUE)
+```
+
+GH & Hypopituitarism.after.surgery -  p-value < 0.05 - statistically significant
+```r
+t.test(With_adenoma_file$GH, With_adenoma_file$Hypopituitarism.after.surgery, paired = TRUE)
+```
