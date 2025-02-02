@@ -40,10 +40,6 @@ skimr::skim(With_adenoma_file)
 skimr::skim(Without_adenoma_file)
 
 
-# Re-index the 'No' column
-adenoma_file$No <- seq_len(nrow(adenoma_file))
-
-
 
 ### 3. Descriptive Statistics and Variable Transformation
 # Using the DescTools package, we generate descriptive statistics and transform variables 
